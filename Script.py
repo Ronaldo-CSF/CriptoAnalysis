@@ -223,21 +223,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Proporções
-train_size = int(len(df) * 0.7)  # 70% para treino
-val_size = int(len(df) * 0.2)    # 20% para validação
+train_size = int(len(df) * 0.8)  # 80% para treino
 
-# Divisão em treino, validação e teste
+# Divisão em treino e teste
 train = df[:train_size]
-val = df[train_size:train_size + val_size]
-test = df[train_size + val_size:]
+test = df[train_size:]
 
 # Verificando as divisões
-print(f'Tamanho treino: {len(train)}, validação: {len(val)}, teste: {len(test)}')
+print(f'Tamanho treino: {len(train)}, teste: {len(test)}')
 
 
 # Preparação dos dados
 X_train, y_train = train.drop(columns=['close']), train['close']
-X_val, y_val = val.drop(columns=['close']), val['close']
 X_test, y_test = test.drop(columns=['close']), test['close']
 
 
@@ -250,7 +247,6 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 
 # Usar o mesmo escalador nos outros conjuntos
-X_val_scaled = scaler.transform(X_val)
 X_test_scaled = scaler.transform(X_test)
 
 # ------------------------------------------------------------------------------------------------ #
@@ -258,23 +254,22 @@ X_test_scaled = scaler.transform(X_test)
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-# Fazer previsões no conjunto de validação e teste usando o modelo de persistência com retornos
-val['return_BM'] = train['return_pct'].iloc[-1] / 100  # Use o último retorno conhecido no treino
-val['predicted_price_BM'] = val['close'].shift(1) * (1 + val['return_BM'])
-
-test['return_BM'] = val['return_pct'].iloc[-1] / 100  # Use o último retorno conhecido na validação
+# Fazer previsões no conjunto de teste usando o modelo de persistência com retornos
+test['return_BM'] = train['return_pct'].iloc[-1] / 100  # Use o último retorno conhecido no treino
 test['predicted_price_BM'] = test['close'].shift(1) * (1 + test['return_BM'])
 
-# Calcular o erro (exemplo: MAE)
-mae_benchmark_val = mean_absolute_error(val['close'].iloc[1:], val['predicted_price_BM'].iloc[1:])
-print(f'MAE_val do Benchmark: {mae_benchmark_val: .2f}')
-mae_benchmark_test = mean_absolute_error(test['close'].iloc[1:], test['predicted_price_BM'].iloc[1:])
-print(f'MAE_test do Benchmark: {mae_benchmark_test: .2f}')
+# O valor faltante é igual ao valor presente na coluna y_test
+test['predicted_price_BM'][0]=test['close'][0]
 
-mse_val = mean_squared_error(y_val, val['predicted_price_BM'])
-rmse_val = np.sqrt(mse_val)
-mse_test = mean_squared_error(y_test, test['predicted_price_BM'])
-rmse_test = np.sqrt(mse_test)
+# Calcular o erro (exemplo: MAE)
+mae_benchmark_test = mean_absolute_error(test['close'].iloc[1:], test['predicted_price_BM'].iloc[1:])
+
+mse_benchmark_test = mean_squared_error(y_test, test['predicted_price_BM'])
+rmse_benchmark_test = np.sqrt(mse_benchmark_test)
+
+print(f'MAE_test do Benchmark: {mae_benchmark_test: .2f}')
+print(f'MSE_test do Benchmark: {mse_benchmark_test: .2f}')
+print(f'RMSE_test do Benchmark: {rmse_benchmark_test: .2f}')
 
 # %% In[17]: Aplicar o Algoritmo de Random Forest
 
@@ -288,31 +283,50 @@ rf_model = RandomForestRegressor(n_estimators=300, random_state=42)
 # Treinamento
 rf_model.fit(X_train_scaled, y_train)
 
-# Previsão no conjunto de validação
-y_val_pred = rf_model.predict(X_val_scaled)
+# Previsão no conjunto de teste
+y_test_pred = rf_model.predict(X_test_scaled)
 
-# Avaliação no conjunto de validação
-mae_val = mean_absolute_error(y_val, y_val_pred)
-mse_val = mean_squared_error(y_val, y_val_pred)
-rmse_val = np.sqrt(mse_val)
+# Avaliação no conjunto de teste
+mae_rf_test = mean_absolute_error(y_test, y_test_pred)
+mse_rf_test = mean_squared_error(y_test, y_test_pred)
+rmse_rf_test = np.sqrt(mse_rf_test)
 
-print(f'MAE validação: {mae_val:.2f}')
-print(f'MSE validação: {mse_val:.2f}')
-print(f'RMSE validação: {rmse_val:.2f}')
+print(f'MAE test: {mae_rf_test:.2f}')
+print(f'MSE test: {mse_rf_test:.2f}')
+print(f'RMSE test: {rmse_rf_test:.2f}')
 
-# %% In[18]: Visualizando os resultados de validação:
+# Calculo do incicador MASE
+mase_rf = mae_rf_test/mae_benchmark_test
+print(f'O MASE para RF: {mase_rf: .2f}')
+# %% [markdown]
+# >Como temos que RMSE_RF < RMSE_benchmark e MASE_RF < 1 concluimos que o modelo de RF é superior ao 
+# Modelo de Persistência com Retornos usado como benchmarket nesse trabalho
+
+
+# %% In[18]: Visualizando os resultados do modelo:
+
+# Previsões completas: treino e teste
+y_train_pred = rf_model.predict(X_train_scaled)
+y_test_pred = rf_model.predict(X_test_scaled)
+
+# Concatenando os valores reais e previstos
+y_real = pd.concat([y_train, y_test])
+y_pred = pd.concat([
+    pd.Series(y_train_pred, index=y_train.index),
+    pd.Series(y_test_pred, index=y_test.index)
+])
 
 plt.figure(figsize=(10, 6))
 
 # Plotando os valores reais com as datas no eixo x
-plt.plot(y_val.index, y_val, label='Valores Reais', color = 'blue')
+plt.plot(y_real.index, y_real, label='Série Original (Valores Reais)', color = 'blue', alpha=0.7)
 
 # Plotando as previsões com as mesmas datas
-plt.plot(y_val.index, y_val_pred, label='Previsões', color = 'orange')
+plt.plot(y_pred.index, y_pred, label='Previsões (treino+teste)', color = 'orange', alpha=0.7)
 
 # Ajustando o gráfico
 plt.legend()
-plt.title('Valores Reais vs Previsões (Random Forest)')
+plt.title('Série Temporal: Original vs Previsões (Random Forest)')
 plt.xlabel('Data')  # Rótulo do eixo x
 plt.ylabel('Valor de Fechamento')  # Rótulo do eixo y
 plt.grid(True)
@@ -322,61 +336,6 @@ plt.xticks(rotation=45)
 
 plt.tight_layout()
 plt.show()
-
-
-# %% In[19]: Avaliação no Conjunto de Teste
-# Após ajustar o modelo com os dados de validação, avaliamos no conjunto de teste para verificar a generalização:
-
-y_test_pred = rf_model.predict(X_test_scaled)
-
-# Avaliação
-mae_test = mean_absolute_error(y_test, y_test_pred)
-mse_test = mean_squared_error(y_test, y_test_pred)
-rmse_test = np.sqrt(mse_test)
-
-print(f'MAE teste: {mae_test:.2f}')
-print(f'MSE teste: {mse_test:.2f}')
-print(f'RMSE teste: {rmse_test:.2f}')
-
-
-
-# %% In[20]: Testando a combinação dos gráficos
-
-# Previsões completas: treino, validação e teste
-y_train_pred = rf_model.predict(X_train_scaled)
-y_val_pred = rf_model.predict(X_val_scaled)
-y_test_pred = rf_model.predict(X_test_scaled)
-
-# Concatenando os valores reais e previstos
-y_real = pd.concat([y_train, y_val, y_test])
-y_pred = pd.concat([
-    pd.Series(y_train_pred, index=y_train.index),
-    pd.Series(y_val_pred, index=y_val.index),
-    pd.Series(y_test_pred, index=y_test.index)
-])
-
-# Gráfico comparativo
-plt.figure(figsize=(12, 6))
-
-# Série temporal original (valores reais)
-plt.plot(y_real.index, y_real.values, label='Série Original (Valores Reais)', color='blue', alpha=0.7)
-
-# Previsões (treino + validação + teste)
-plt.plot(y_pred.index, y_pred.values, label='Previsões (Treino + Validação + Teste)', color='orange', alpha=0.7)
-
-# Ajustando o gráfico
-plt.legend()
-plt.title('Série Temporal: Original vs Previsões (Random Forest)')
-plt.xlabel('Data')
-plt.ylabel('Valor de Fechamento')
-plt.grid(True)
-
-# Rotação das datas para melhor visualização
-plt.xticks(rotation=45)
-
-plt.tight_layout()
-plt.show()
-
 
 # %% [markdown]
 # ### 3. Pré-processamento dos Dados: 
@@ -417,4 +376,3 @@ plt.show()
 #           df[["volume", "number_of_trades"]] = df[["volume", "number_of_trades"]].fillna(0)
 #    5. Preparação dos dados para Random Forest 
 #       X = cripto_1hr_stand[['volume', 'number_of_trades', 'return_pct', 'SMA_10', 'EMA_10', 'RSI']] 
-
