@@ -271,9 +271,10 @@ print(f'MAE_val do Benchmark: {mae_benchmark_val: .2f}')
 mae_benchmark_test = mean_absolute_error(test['close'].iloc[1:], test['predicted_price_BM'].iloc[1:])
 print(f'MAE_test do Benchmark: {mae_benchmark_test: .2f}')
 
-mse_val = mean_squared_error(y_val, y_val_pred)
+mse_val = mean_squared_error(y_val, val['predicted_price_BM'])
 rmse_val = np.sqrt(mse_val)
-
+mse_test = mean_squared_error(y_test, test['predicted_price_BM'])
+rmse_test = np.sqrt(mse_test)
 
 # %% In[17]: Aplicar o Algoritmo de Random Forest
 
