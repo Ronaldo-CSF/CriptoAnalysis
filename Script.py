@@ -45,6 +45,8 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
+
+from grafico import formatar_grafico_mbausp
 # import sklearn
 
 eth_data = pd.read_csv("databases/ETHUSDT.csv")
@@ -80,17 +82,21 @@ print(sol_ts.head())  # Verifique os primeiros valores
 # In[7]: Grafico como serie de tempo usando Plotly (Selecione todos os comandos)
 plt.figure(figsize=(10, 6))
 plt.plot(sol_ts)
-plt.title('Cotacao de SOL - Serie Temporal')
+# plt.title('Cotações de Fechamento minuto a minuto de Solana')
 plt.xlabel('Timestamp')
-plt.ylabel('Fechamento (SOL_USD)')
+plt.ylabel('Fechamento (SOLUSD)')
 plt.show()
+
+# formatar_grafico_mbausp(sol_ts, sol_ts, "Timestamp",
+#                         "Cotações de Fechamento minuto a minuto de Solana")
+
 
 # In[8]: Grafico como serie de tempo usando Plotly (Selecione todos os comandos)
 plt.figure(figsize=(10, 6))
 plt.plot(eth_ts)
-plt.title('Cotacao de ETHER - Serie Temporal')
+# plt.title('Cotações de Fechamento minuto a minuto de Ether')
 plt.xlabel('Timestamp')
-plt.ylabel('Fechamento (ETHER_USD)')
+plt.ylabel('Fechamento (ETHUSD)')
 plt.show()
 
 # ------------------------------------------------------------------------------
@@ -144,7 +150,7 @@ print(cripto_1dia)
 # In[10]: Preencher Missing Values
 
 # lista de resamples
-resample_cripto = (cripto_5min, cripto_15min, cripto_30min, cripto_1hr, cripto_1dia)
+resample_cripto = (cripto, cripto_5min, cripto_15min, cripto_30min, cripto_1hr, cripto_1dia)
 
 for df in resample_cripto:
     # Preenchendo a 'close' com o último valor válido
@@ -155,7 +161,7 @@ for df in resample_cripto:
 
 # Decomposicao pelo modelo ADITIVO
 from statsmodels.tsa.seasonal import seasonal_decompose
-cripto_decomp = seasonal_decompose(cripto_1hr["close"], model='aditive', period=24*30*12)
+cripto_decomp = seasonal_decompose(cripto["close"], model='aditive', period=60*24*30*12)
 
 # observando os valores da decomposicao pelo modelo aditivo
 print(cripto_decomp.trend)
@@ -297,7 +303,9 @@ print(f'RMSE test: {rmse_rf_test:.2f}')
 
 # Calculo do incicador MASE
 mase_rf = mae_rf_test/mae_benchmark_test
-print(f'O MASE para RF: {mase_rf: .2f}')
+print(f'MASE para RF: {mase_rf: .2f}')
+
+
 # %% [markdown]
 # >Como temos que RMSE_RF < RMSE_benchmark e MASE_RF < 1 concluimos que o modelo de RF é superior ao 
 # Modelo de Persistência com Retornos usado como benchmarket nesse trabalho
