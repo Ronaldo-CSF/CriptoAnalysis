@@ -222,7 +222,7 @@ for df in resample_cripto:
 
 # %% In[14]: Segregar o dataset em dados de treino, validação e teste
 
-df = cripto_1dia
+df = cripto
 
 # Importação de bibliotecas
 import numpy as np
@@ -258,24 +258,50 @@ X_test_scaled = scaler.transform(X_test)
 # ------------------------------------------------------------------------------------------------ #
 # %% In[16]: Aplicar o Algoritmo de Return-Based Naive Model usado como benchmark
 
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+# from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-# Fazer previsões no conjunto de teste usando o modelo de persistência com retornos
-test['return_BM'] = train['return_pct'].iloc[-1] / 100  # Use o último retorno conhecido no treino
-test['predicted_price_BM'] = test['close'].shift(1) * (1 + test['return_BM'])
+# # Fazer previsões no conjunto de teste usando o modelo de persistência com retornos
+# test['return_BM'] = train['return_pct'].iloc[-1] / 100  # Use o último retorno conhecido no treino
 
-# O valor faltante é igual ao valor presente na coluna y_test
-test['predicted_price_BM'][0]=test['close'][0]
+# # Criando a coluna de valores previstos
+# test['predicted_price_BM']=''
+
+# # Copiando o primeiro valor real do conjunto de teste para valores previstos
+# test['predicted_price_BM'][0]=test['close'][0]
+
+# #Prevendo com base na fórmula mantendo os valores cumulativos
+# test['predicted_price_BM'] = test['predicted_price_BM'].iloc[0] * (1 + test['return_BM']).cumprod()
+
+# # Calcular o erro (exemplo: MAE)
+# mae_benchmark_test = mean_absolute_error(test['close'].iloc[1:], test['predicted_price_BM'].iloc[1:])
+
+# mse_benchmark_test = mean_squared_error(y_test, test['predicted_price_BM'])
+# rmse_benchmark_test = np.sqrt(mse_benchmark_test)
+
+# print(f'MAE_test do Benchmark: {mae_benchmark_test: .2f}')
+# print(f'MSE_test do Benchmark: {mse_benchmark_test: .2f}')
+# print(f'RMSE_test do Benchmark: {rmse_benchmark_test: .2f}')
+
+# > Não foi aplicado, resultados inferiores ao Naive tradicional
+
+# %% [Teste]: Algoritmo Naive
+
+# Criando a coluna de valores previstos
+test['predicted_price_BM2']=test['close'][0]
+
+# Copiando o primeiro valor real do conjunto de teste para valores previstos
+test['predicted_price_BM2'][0]=test['close'][0]
 
 # Calcular o erro (exemplo: MAE)
-mae_benchmark_test = mean_absolute_error(test['close'].iloc[1:], test['predicted_price_BM'].iloc[1:])
+mae_benchmark_test = mean_absolute_error(test['close'].iloc[1:], test['predicted_price_BM2'].iloc[1:])
 
-mse_benchmark_test = mean_squared_error(y_test, test['predicted_price_BM'])
+mse_benchmark_test = mean_squared_error(y_test, test['predicted_price_BM2'])
 rmse_benchmark_test = np.sqrt(mse_benchmark_test)
 
 print(f'MAE_test do Benchmark: {mae_benchmark_test: .2f}')
 print(f'MSE_test do Benchmark: {mse_benchmark_test: .2f}')
 print(f'RMSE_test do Benchmark: {rmse_benchmark_test: .2f}')
+
 
 # %% In[17]: Aplicar o Algoritmo de Random Forest
 
@@ -305,6 +331,8 @@ print(f'RMSE test: {rmse_rf_test:.2f}')
 mase_rf = mae_rf_test/mae_benchmark_test
 print(f'MASE para RF: {mase_rf: .2f}')
 
+# %%
+RF_1min = [mae_rf_test,mse_rf_test,rmse_rf_test,mase_rf]
 
 # %% [markdown]
 # >Como temos que RMSE_RF < RMSE_benchmark e MASE_RF < 1 concluimos que o modelo de RF é superior ao 
