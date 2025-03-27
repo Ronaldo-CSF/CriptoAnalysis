@@ -11,7 +11,7 @@
 # Para tal será realizada uma análise comparativa da precisão de previsões dos preços das criptomoedas Ether e 
 # Sol, utilizando três técnicas distintas de aprendizado de máquina: Random Forest [RF], LSTM e GRU. Pretende-se avaliar a 
 # eficiência e acurácia de cada modelo nas previsões, por meio das métricas de Erro Quadrático Médio [MSE], Raiz do Erro 
-# Quadrático Médio [RMSE] e Erro Absoluto Médio [MAE]; proporcionando uma compreensão sobre o desempenho de cada abordagem.
+# Quadrático Médio [RMSE], Erro Absoluto Médio [MAE]; proporcionando uma compreensão sobre o desempenho de cada abordagem.
 # 
 # 
 # ## Estrutura do Trabalho
@@ -37,7 +37,7 @@
 # Utilizar visualizações gráficas e estatísticas descritivas para identificar tendências e anomalias.
 # 
 
-# %%  In[0]: Importação de Pacotes e base de dados
+#%% In[0]: Importação de Pacotes
 import pandas as pd  
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,80 +45,45 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
-
+from time import time
 from grafico import formatar_grafico_mbausp
-# import sklearn
 
+#%% In[1]: Importar base de dados
 eth_data = pd.read_csv("databases/ETHUSDT.csv")
 sol_data = pd.read_csv("databases/SOLUSDT.csv")
 
-# %%  In[1]: Visualização das 6 primeiras observações
+#%%  In[2.1]: Visualização das 6 primeiras e últimas observações
 eth_data.head()
 
-# %% In[2]: Visualização das 6 primeiras observações
+#%% In[2.2]: Visualização das 6 primeiras observações
 sol_data.head() 
 
-# %% In[3]: Visualização das variáveis
+#%% In[3]: Visualização das variáveis
 print(eth_data.keys(),sol_data.keys(), sep="\n\n")
 
-# %% In[4]: Selecionar as Variáveis a manter
-sol = sol_data[['timestamp', 'close']]
-eth = eth_data[['timestamp', 'close']]
+#%% In[4]: Selecionar a Cripto a ser analisada
+cripto_lista = {"eth":eth_data, "sol":sol_data}
 
-eth['timestamp'] = pd.to_datetime(eth['timestamp'])
-eth.set_index('timestamp', inplace=True)
+#%% In[5]: Selecionar as Variáveis a manter
+cripto = cripto_lista["eth"][['timestamp', 'close']]
 
-sol['timestamp'] = pd.to_datetime(sol['timestamp'])
-sol.set_index('timestamp', inplace=True)
+cripto['timestamp'] = pd.to_datetime(cripto['timestamp'])
+cripto.set_index('timestamp', inplace=True)
 
-# %% In[5]: Criação de Objeto TimeSeries
-eth_ts = pd.Series(data=eth['close'].values,index=eth.index)
-print(eth_ts.head())  # Verifique os primeiros valores
+#%% In[6]: Criação de Objeto TimeSeries
+cripto_ts = pd.Series(data=cripto['close'].values,index=cripto.index)
+print(cripto_ts.head())  # Verifique os primeiros valores
 
-# %% In[6]: Criação de Objeto TimeSeries
-sol_ts = pd.Series(data=sol['close'].values, index=sol.index)
-print(sol_ts.head())  # Verifique os primeiros valores
+#%% In[7]: Grafico como serie de tempo usando Plotly (Selecione todos os comandos)
+formatar_grafico_mbausp(cripto_ts,cripto_ts,titulo_x="Timestamp",
+                        titulo_y="Fechamento (ETHUSD)")
 
-# In[7]: Grafico como serie de tempo usando Plotly (Selecione todos os comandos)
-plt.figure(figsize=(10, 6))
-plt.plot(sol_ts)
-# plt.title('Cotações de Fechamento minuto a minuto de Solana')
-plt.xlabel('Timestamp')
-plt.ylabel('Fechamento (SOLUSD)')
-plt.show()
-
-# formatar_grafico_mbausp(sol_ts, sol_ts, "Timestamp",
-#                         "Cotações de Fechamento minuto a minuto de Solana")
-
-
-# In[8]: Grafico como serie de tempo usando Plotly (Selecione todos os comandos)
-plt.figure(figsize=(10, 6))
-plt.plot(eth_ts)
-# plt.title('Cotações de Fechamento minuto a minuto de Ether')
-plt.xlabel('Timestamp')
-plt.ylabel('Fechamento (ETHUSD)')
-plt.show()
-
-# ------------------------------------------------------------------------------
-
-# %% [markdown]
-# A PARTIR DESSE MOMENTO TODO O TRABALHO VAI SER DESENVOLVIDO PARA ETH, E POSTERIORMENTE AJUSTADO PARA INCLUIR SOL!
-
-# ------------------------------------------------------------------------------
-
-cripto = eth
+#%% In[8]: Preencher os valores faltantes com base no valor mais recente: 
+# forward fill
 
 cripto['close'] = cripto['close'].ffill()
 
 # %% In[9]: Realizando o resamplying dos dados
-
-# 5 min
-cripto_5min = cripto.resample('5T').mean()
-print(cripto_5min)
-
-# 15 min
-cripto_15min = cripto.resample('15T').mean()
-print(cripto_15min)
 
 # 30 min
 cripto_30min = cripto.resample('30T').mean()
@@ -132,25 +97,17 @@ print(cripto_1hr)
 cripto_1dia = cripto.resample('1D').mean()
 print(cripto_1dia)
 
-# cripto_5min = pd.Series(data=cripto_5min['close'].values, index=cripto_5min.index)
-# cripto_15min = pd.Series(data=cripto_15min['close'].values, index=cripto_15min.index)
-# cripto_30min = pd.Series(data=cripto_30min['close'].values, index=cripto_30min.index)
-# cripto_1hr = pd.Series(data=cripto_1hr['close'].values, index=cripto_1hr.index)
-# cripto_1dia = pd.Series(data=cripto_1dia['close'].values, index=cripto_1dia.index)
-
-
 # %% [markdown]
 
 # >Ao analisar as colunas formadas observa-se a presença de valores faltantes, o que prejudica a analise e  
-# impede a continuação do código. Como os dados utilizados são de cotações, a ultima cotação existente é o  
-# último preço do ativo. Essa é a própria forma como o preço é apresentado. Assim, iremos preencher os valores  
-# com o último valor presente e as colunas de volume e numero de transações com zero.
-
+# impede a continuação do código. Como os dados utilizados são de cotações, a última cotação existente é o  
+# último preço do ativo. Essa é a própria forma como o preço é apresentado. Assim, iremos preencher esses 
+# valores com o último valor presente e as colunas de volume e número de transações com zero.
 
 # In[10]: Preencher Missing Values
 
 # lista de resamples
-resample_cripto = (cripto, cripto_5min, cripto_15min, cripto_30min, cripto_1hr, cripto_1dia)
+resample_cripto = [cripto, cripto_30min, cripto_1hr, cripto_1dia]
 
 for df in resample_cripto:
     # Preenchendo a 'close' com o último valor válido
@@ -222,30 +179,28 @@ for df in resample_cripto:
 
 # %% In[14]: Segregar o dataset em dados de treino, validação e teste
 
-df = cripto
-
-# Importação de bibliotecas
-import numpy as np
-import matplotlib.pyplot as plt
+# Lembre: resample_cripto = [cripto, cripto_30min, cripto_1hr, cripto_1dia]
+df = resample_cripto[3] #cripto_1dia
 
 # Proporções
 train_size = int(len(df) * 0.8)  # 80% para treino
+# val_size = int(len(df) * 0.2)    # 20% para validação
 
 # Divisão em treino e teste
 train = df[:train_size]
+# val = df[train_size:train_size+val_size]
 test = df[train_size:]
 
 # Verificando as divisões
 print(f'Tamanho treino: {len(train)}, teste: {len(test)}')
 
-
 # Preparação dos dados
 X_train, y_train = train.drop(columns=['close']), train['close']
+# X_val, y_val = val.drop(columns=['close']), val['close']
 X_test, y_test = test.drop(columns=['close']), test['close']
 
 
 # %% In[15]: Aplicar a normalização dos dados de treino do modelo
-
 from sklearn.preprocessing import StandardScaler
 
 # Escalonar apenas o conjunto de treino
@@ -253,10 +208,11 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 
 # Usar o mesmo escalador nos outros conjuntos
+X_val_scaled = scaler.transform(X_test)
 X_test_scaled = scaler.transform(X_test)
 
 # ------------------------------------------------------------------------------------------------ #
-# %% In[16]: Aplicar o Algoritmo de Return-Based Naive Model usado como benchmark
+ # %% In[16_x]: Aplicar o Algoritmo de Return-Based Naive Model usado como benchmark
 
 # from sklearn.metrics import mean_absolute_error, mean_squared_error
 
@@ -284,7 +240,11 @@ X_test_scaled = scaler.transform(X_test)
 
 # > Não foi aplicado, resultados inferiores ao Naive tradicional
 
-# %% [Teste]: Algoritmo Naive
+# %% In[16]: Aplicar o Algoritmoo Naive, considerando para esse algoritmo
+# o ultimo valor presente no conjunto de validação
+
+# Tempo inicial
+start_time = time()
 
 # Criando a coluna de valores previstos
 test['predicted_price_BM2']=test['close'][0]
@@ -302,15 +262,48 @@ print(f'MAE_test do Benchmark: {mae_benchmark_test: .2f}')
 print(f'MSE_test do Benchmark: {mse_benchmark_test: .2f}')
 print(f'RMSE_test do Benchmark: {rmse_benchmark_test: .2f}')
 
+# Calculo de Tempo de Execução
+end_time = time()
+execution_time = end_time - start_time
+
+if df is resample_cripto[3]:  
+    Naive_result_dia = [mae_benchmark_test, mse_benchmark_test, rmse_benchmark_test,'NA',
+                execution_time]
+elif df is resample_cripto[2]:
+    Naive_result_hr = [mae_benchmark_test, mse_benchmark_test, rmse_benchmark_test,'NA',
+                execution_time]
+elif df is resample_cripto[1]:
+    Naive_result_30min = [mae_benchmark_test, mse_benchmark_test, rmse_benchmark_test,'NA',
+                execution_time]
+elif df is resample_cripto[0]:
+    Naive_result_1min = [mae_benchmark_test, mse_benchmark_test, rmse_benchmark_test,'NA',
+                execution_time]
+
+print(f'O tempo que o modelo levou para treinar foi de: {execution_time}')
+
+# %% [markdown]
+
+# ### Modelagem
+# A partir desse momento serão apresentados os algoritmos a serem utilizados nesse
+# estudo.
+# #### 1. Random Forest
 
 # %% In[17]: Aplicar o Algoritmo de Random Forest
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from time import time
 
-# %% Para o conjunto de validação
+# %% In[17]: Random Forest Puro
+
+start_time = time()
+
 # Modelo Random Forest
-rf_model = RandomForestRegressor(n_estimators=300, random_state=42)
+rf_model = RandomForestRegressor(n_estimators=300, 
+                                 random_state=42,
+                                 criterion='squared_error',
+                                 n_jobs=-1) #max_depth=10 - testar
 
 # Treinamento
 rf_model.fit(X_train_scaled, y_train)
@@ -331,15 +324,138 @@ print(f'RMSE test: {rmse_rf_test:.2f}')
 mase_rf = mae_rf_test/mae_benchmark_test
 print(f'MASE para RF: {mase_rf: .2f}')
 
-# %%
-RF_1min = [mae_rf_test,mse_rf_test,rmse_rf_test,mase_rf]
+end_time = time()
+execution_time = end_time - start_time
+print(f'O tempo que o modelo levou para treinar foi de: {execution_time}')
+
+if df is resample_cripto[3]:  
+    RF_result_dia = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+elif df is resample_cripto[2]:
+    RF_result_hr = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+elif df is resample_cripto[1]:
+    RF_result_30min = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+elif df is resample_cripto[0]:
+    RF_result_1min = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+
+# ------------------------------------------------------------------------------
+
+#%% In[18]: Random Forest com GridSearch
+
+start_time = time()
+
+param_grid = {
+    "n_estimators": [100, 300, 500, 1000],
+    "max_features": ["sqrt",None], # Como sqrt(4)=log2(4), não faz sentido variar
+    "max_depth": [10, 20, 100, None],
+    "min_samples_leaf":[1,5],
+    }
+
+rf_model = RandomForestRegressor(random_state=42)
+
+grid_search = GridSearchCV(estimator=rf_model, 
+                           param_grid=param_grid, 
+                           scoring='neg_root_mean_squared_error', 
+                           cv=4, 
+                           n_jobs=-1)
+
+grid_search.fit(X_train, y_train.values)
+
+# Print the best parameters and the best score
+print(grid_search)
+print(grid_search.best_params_)
+print(grid_search.best_score_)
+end_time = time()
+execution_time = end_time - start_time
+print(f'O tempo que o modelo levou para treinar foi de: {execution_time}')
+
+grid_results = grid_search.cv_results_
+
+ #%% Rodando o melhor modelo
+start_time = time()
+
+# SOL - 1dia parametros: {n_estimators= 1000, max_features= 'sqrt', max_depth= 20,
+#                           min_samples_leaf= 1,random_state=42,n_jobs=-1}
+
+# SOL - 1hr parametros: {n_estimators= 100, max_features= 'sqrt', max_depth= 100,
+#                           min_samples_leaf= 1,random_state=42,n_jobs=-1}
+
+# SOL - 30min parametros: {n_estimators= 1000, max_features= 'sqrt', max_d epth= 20,
+#                           min_samples_leaf= 1,random_state=42,n_jobs=-1}
+
+# ETHER - 1dia parametros: {n_estimators= 300, max_features= 'sqrt', max_depth= 20,
+#                           min_samples_leaf= 1,random_state=42,n_jobs=-1}
+
+# ETHER - 1hr parametros: {n_estimators= 1000, max_features= 'sqrt', max_depth= 20,
+#                           min_samples_leaf= 1,random_state=42,n_jobs=-1}
+
+# ETHER - 30min parametros: {n_estimators= 1000, max_features= None, max_depth= None,
+#                           min_samples_leaf= 1,random_state=42,n_jobs=-1}
+
+
+best_rf_model = RandomForestRegressor(n_estimators = 1000,
+                                      max_features = None,
+                                      max_depth = None,
+                                      min_samples_leaf = 1,
+                                      random_state = 42,
+                                      n_jobs = -1)
+
+best_rf_model.fit(X_train, y_train.values)
+
+# Previsão no conjunto de teste
+y_test_pred = best_rf_model.predict(X_test_scaled)
+
+# Avaliação no conjunto de teste
+mae_rf_test = mean_absolute_error(y_test, y_test_pred)
+mse_rf_test = mean_squared_error(y_test, y_test_pred)
+rmse_rf_test = np.sqrt(mse_rf_test)
+
+print(f'MAE test: {mae_rf_test:.2f}')
+print(f'MSE test: {mse_rf_test:.2f}')
+print(f'RMSE test: {rmse_rf_test:.2f}')
+
+# Calculo do incicador MASE
+mase_rf = mae_rf_test/mae_benchmark_test
+print(f'MASE para RF: {mase_rf: .2f}')
+
+end_time = time()
+execution_time = end_time - start_time
+print(f'O tempo que o modelo levou para treinar foi de: {execution_time}')
+
+if df is resample_cripto[3]:  
+    best_RF_result_dia = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+elif df is resample_cripto[2]:
+    best_RF_result_hr = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+elif df is resample_cripto[1]:
+    best_RF_result_30min = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+elif df is resample_cripto[0]:
+    best_RF_result_1min = [mae_rf_test, mse_rf_test, rmse_rf_test,mase_rf,
+                execution_time]
+
+
+
+
+
+
+
+
+
+
+
+
 
 # %% [markdown]
 # >Como temos que RMSE_RF < RMSE_benchmark e MASE_RF < 1 concluimos que o modelo de RF é superior ao 
 # Modelo de Persistência com Retornos usado como benchmarket nesse trabalho
 
 
-# %% In[18]: Visualizando os resultados do modelo:
+# %% In[19]: Visualizando os resultados do modelo:
 
 # Previsões completas: treino e teste
 y_train_pred = rf_model.predict(X_train_scaled)
@@ -349,8 +465,7 @@ y_test_pred = rf_model.predict(X_test_scaled)
 y_real = pd.concat([y_train, y_test])
 y_pred = pd.concat([
     pd.Series(y_train_pred, index=y_train.index),
-    pd.Series(y_test_pred, index=y_test.index)
-])
+    pd.Series(y_test_pred, index=y_test.index)])
 
 plt.figure(figsize=(10, 6))
 
